@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pickleball Feeder – Stable Build</title>
+<style>
+body{margin:0;overflow:hidden;background:#f0f0f0}  canvas{display:block}
+#info{position:absolute;top:8px;width:100%;text-align:center;font:14px Arial;color:#333;pointer-events:none}
+#controls{position:absolute;bottom:10px;left:10px;padding:8px 10px;background:rgba(255,255,255,.85);border-radius:6px;font:12px Arial}
+</style>
+</head>
+<body>
+<div id="info">F = wings | P = posts</div>
+<div id="controls"><b>Mouse</b> orbit · pan · zoom</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+/* ── primary dimensions (ft→m) ── */
+const FT=0.3048;
+const FRONT_W=22*FT, FRONT_H=(34/12+36/12)/2*FT, BAND_Y=34/12*FT;
+const DEPTH=10*FT;
+const REAR_W=5*FT,  REAR_H=8*FT;
+const WING_W=3*FT,  WING_H=8*FT;
+const TROUGH_L=REAR_W, TROUGH_W=0.9*FT, TROUGH_D=0.4*FT;
+const ELEV_W=0.5,   ELEV_D=0.5,  ELEV_H=1.0;
+const R_HOLE=0.1016;                        // 8-inch radius
+
+/* wing / post fold targets */
+const W_DEP=5*Math.PI/4, W_STOW=0;
+const P_STOW=-Math.PI/2, P_UP=0;
+
+/* ── scene boilerplate ── */
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe0e8f0);
+const camera= new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,2000);
+camera.position.set(7,3,14); camera.lookAt(0,FRONT_H/2,0);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); document.body.appendChild(renderer.domElement);
+
+const controls=new THREE.OrbitControls(camera,renderer.domElement); controls.enableDamping=true;
+scene.add(new THREE.AmbientLight(0xffffff,1.2));
+
+let wingsFolded=true, postsFolded=true;
+
+/* helpers */
+function makeNet(col,w,h){
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(w,h),
+    new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide,transparent:true,opacity:.5})
+  );
+}
+function addLine(a,b){
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([a,b]),
+    new THREE.LineBasicMaterial({color:0xffaa00})
+  ));
+}
+
+/* ── ground ── */
+const ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(40,40),
+  new THREE.MeshBasicMaterial({color:0x8ab26b,side:THREE.DoubleSide})
+);
+ground.rotation.x=-Math.PI/2; scene.add(ground);
+
+/* ── front posts + net ── */
+const postGeo=new THREE.CylinderGeometry(0.05,0.05,FRONT_H,16);
+const postMat=new THREE.MeshBasicMaterial({color:0x333});
+const lPost=new THREE.Group(); lPost.position.set(-FRONT_W/2,0,-DEPTH/2); scene.add(lPost);
+const rPost=new THREE.Group(); rPost.position.set( FRONT_W/2,0,-DEPTH/2); scene.add(rPost);
+
+const lp=new THREE.Mesh(postGeo,postMat); lp.position.set(0,FRONT_H/2,0); lPost.add(lp);
+const rp=new THREE.Mesh(postGeo,postMat); rp.position.set(0,FRONT_H/2,0); rPost.add(rp);
+
+const topBar=new THREE.Mesh(new THREE.BoxGeometry(FRONT_W,0.02,0.05),postMat);
+topBar.position.set(0,FRONT_H-0.01,-DEPTH/2); scene.add(topBar);
+
+const fNet=makeNet(0x202020,FRONT_W,FRONT_H); fNet.position.set(0,FRONT_H/2,-DEPTH/2); scene.add(fNet);
+
+/* ── rear net ── */
+const rNet=makeNet(0x404040,REAR_W,REAR_H); rNet.position.set(0,REAR_H/2,DEPTH/2); scene.add(rNet);
+
+/* ── wings ── */
+const lWing=new THREE.Group(); lWing.position.set(-REAR_W/2,0,DEPTH/2); scene.add(lWing);
+const rWing=new THREE.Group(); rWing.position.set( REAR_W/2,0,DEPTH/2); scene.add(rWing);
+const lwPanel=makeNet(0x384858,WING_W,WING_H); lwPanel.position.set(WING_W/2,WING_H/2,0); lWing.add(lwPanel);
+const rwPanel=makeNet(0x384858,WING_W,WING_H); rwPanel.position.set(-WING_W/2,WING_H/2,0); rwPanel.rotation.y=Math.PI; rWing.add(rwPanel);
+
+/* ── trough ── */
+const trough=new THREE.Mesh(
+  new THREE.BoxGeometry(TROUGH_L,TROUGH_D,TROUGH_W),
+  new THREE.MeshBasicMaterial({color:0x505060,opacity:.8})
+);
+trough.position.set(0,TROUGH_D/2,DEPTH/2 - TROUGH_W/2 - 0.15); scene.add(trough);
+
+/* ── elevator & machine ── */
+const elev=new THREE.Mesh(
+  new THREE.BoxGeometry(ELEV_W,ELEV_H,ELEV_D),
+  new THREE.MeshBasicMaterial({color:0x8899bb,opacity:.35,transparent:true})
+);
+elev.position.set(0,TROUGH_D+ELEV_H/2,DEPTH/2+ELEV_D/2); scene.add(elev);
+const machine=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.45,0.5),
+  new THREE.MeshBasicMaterial({color:0x222}));
+machine.position.set(0,TROUGH_D+ELEV_H+0.225,DEPTH/2+0.5); scene.add(machine);
+
+/* ── funnel sheet at 34″ band with 8″ hole ── */
+const yFront=BAND_Y, yRear=0.05, zFront=-DEPTH/2, zRear=DEPTH/2+0.3;
+const A=new THREE.Vector3(-FRONT_W/2,yFront,zFront);
+const B=new THREE.Vector3( FRONT_W/2,yFront,zFront);
+const C=new THREE.Vector3( REAR_W/2 ,yRear ,zRear );
+const D=new THREE.Vector3(-REAR_W/2 ,yRear ,zRear );
+const centre=new THREE.Vector3(0,THREE.MathUtils.lerp(yFront,yRear,.65),DEPTH/2-0.05);
+
+const verts=[];
+function pushTri(p,q,r){
+  /* skip triangles whose centroid falls inside the 8″ circle */
+  const cx=(p.x+q.x+r.x)/3, cz=(p.z+q.z+r.z)/3;
+  if(Math.hypot(cx-centre.x, cz-centre.z) < R_HOLE) return;
+  verts.push(p.x,p.y,p.z,q.x,q.y,q.z,r.x,r.y,r.z);
+}
+pushTri(A,B,D);
+pushTri(B,C,D);
+
+const funnelGeo=new THREE.BufferGeometry();
+funnelGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+const funnel=new THREE.Mesh(funnelGeo,
+  new THREE.MeshBasicMaterial({color:0x557777,opacity:.35,transparent:true,side:THREE.DoubleSide}));
+scene.add(funnel);
+
+/* hem ring */
+const hem=new THREE.Mesh(new THREE.RingGeometry(R_HOLE*0.88,R_HOLE,32),
+  new THREE.MeshBasicMaterial({color:0x101010}));
+hem.rotation.x=-Math.PI/2; hem.position.copy(centre); scene.add(hem);
+
+/* guy lines (visual only) */
+addLine(new THREE.Vector3(-FRONT_W/2,yFront,zFront), new THREE.Vector3(-FRONT_W/2,yFront,zFront-1));
+addLine(new THREE.Vector3( FRONT_W/2,yFront,zFront), new THREE.Vector3( FRONT_W/2,yFront,zFront-1));
+addLine(new THREE.Vector3(-REAR_W/2 ,yRear ,zRear ), new THREE.Vector3(-REAR_W/2 ,yRear ,zRear+0.6));
+addLine(new THREE.Vector3( REAR_W/2 ,yRear ,zRear ), new THREE.Vector3( REAR_W/2 ,yRear ,zRear+0.6));
+
+/* ── folding state & keys ── */
+function applyState(){
+  lWing.rotation.y = wingsFolded ? W_STOW : -W_DEP;
+  rWing.rotation.y = wingsFolded ? W_STOW :  W_DEP;
+  lPost.rotation.x = rPost.rotation.x = postsFolded ? P_STOW : P_UP;
+  topBar.visible=!postsFolded;
+}
+applyState();
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='f'){ wingsFolded=!wingsFolded; applyState(); }
+  if(k==='p'){ postsFolded=!postsFolded; applyState(); }
+});
+
+/* ── render loop ── */
+(function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene,camera);
+})();
+</script>
+</body>
+</html>
