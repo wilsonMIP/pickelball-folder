@@ -1,0 +1,24 @@
+[submodule "docs/aws/s3"]
+	path = docs/aws/s3
+	url = https://github.com/awsdocs/amazon-s3-userguide.git
+	branch = main
+[submodule "docs/aws/dynamodb"]
+	path = docs/aws/dynamodb
+	url = https://github.com/awsdocs/amazon-dynamodb-developer-guide.git
+	branch = main
+[submodule "docs/aws/lambda"]
+	path = docs/aws/lambda
+	url = https://github.com/awsdocs/aws-lambda-developer-guide.git
+	branch = main
+[submodule "docs/aws/secrets-manager"]
+	path = docs/aws/secrets-manager
+	url = https://github.com/awsdocs/aws-secrets-manager-docs.git
+	branch = main
+[submodule "docs/aws/amplify"]
+	path = docs/aws/amplify
+	url = https://github.com/aws-amplify/docs.git
+	branch = main
+[submodule "docs/aws/sdk-examples"]
+	path = docs/aws/sdk-examples
+	url = https://github.com/awsdocs/aws-doc-sdk-examples.git
+	branch = main
